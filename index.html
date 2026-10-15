@@ -1,4 +1,5 @@
 <!doctype html>
+
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -390,6 +391,75 @@
     .personal-best strong { color: var(--text); }
     .storage-note { font-size: 13px; }
 
+    .missed-review {
+      margin: 0 0 26px;
+      text-align: left;
+    }
+
+    .missed-review-title {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .missed-list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .missed-item {
+      padding: 15px 16px;
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .035);
+    }
+
+    .missed-question {
+      margin: 0 0 10px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.4;
+    }
+
+    .missed-answers {
+      display: grid;
+      gap: 6px;
+      margin: 0 0 10px;
+      font-size: 13px;
+    }
+
+    .missed-answer-row {
+      margin: 0;
+      padding: 6px 10px;
+      border-radius: 9px;
+      font-weight: 600;
+    }
+
+    .missed-answer-row.player-choice {
+      border: 1px solid color-mix(in srgb, var(--wrong) 45%, transparent);
+      color: var(--wrong);
+      background: var(--wrong-bg);
+    }
+
+    .missed-answer-row.correct-choice {
+      border: 1px solid color-mix(in srgb, var(--correct) 45%, transparent);
+      color: var(--correct);
+      background: var(--correct-bg);
+    }
+
+    .missed-fact {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
     .result .restart-button { min-width: 160px; }
 
     .footer-note {
@@ -473,6 +543,10 @@
         <p class="result-score"><span id="final-score"></span>out of 10 correct</p>
         <p class="personal-best"><span id="personal-best-label">Personal best</span>: <strong id="personal-best-score"></strong></p>
         <p class="storage-note" id="storage-note" hidden></p>
+        <section class="missed-review" id="missed-review" aria-labelledby="missed-review-title" hidden>
+          <h2 class="missed-review-title" id="missed-review-title">Review missed answers</h2>
+          <ol class="missed-list" id="missed-list"></ol>
+        </section>
         <button class="restart-button" id="restart-button" type="button">Play again <span aria-hidden="true">↻</span></button>
       </div>
     </section>
@@ -553,11 +627,14 @@
     const answersElement = document.querySelector("#answers");
     const feedback = document.querySelector("#feedback");
     const nextButton = document.querySelector("#next-button");
+    const missedReview = document.querySelector("#missed-review");
+    const missedList = document.querySelector("#missed-list");
     const personalBestKey = "orbit-personal-best";
     let personalBest = null;
     let currentQuestion = 0;
     let score = 0;
     let answered = false;
+    let selectedAnswers = [];
 
     function renderQuestion() {
       const item = questions[currentQuestion];
@@ -591,6 +668,7 @@
     function selectAnswer(index) {
       if (answered) return;
       answered = true;
+      selectedAnswers[currentQuestion] = index;
       const item = questions[currentQuestion];
       const buttons = [...answersElement.querySelectorAll(".answer")];
       buttons.forEach(button => { button.disabled = true; });
@@ -646,6 +724,53 @@
       document.querySelector("#personal-best-score").textContent = `${personalBest} / ${questions.length}`;
     }
 
+    function renderMissedReview() {
+      missedList.replaceChildren();
+      const missedItems = questions
+        .map((item, questionIndex) => ({
+          item,
+          questionIndex,
+          selectedIndex: selectedAnswers[questionIndex]
+        }))
+        .filter(({ item, selectedIndex }) => selectedIndex !== undefined && selectedIndex !== item.correct);
+
+      if (missedItems.length === 0) {
+        missedReview.hidden = true;
+        return;
+      }
+
+      missedItems.forEach(({ item, questionIndex, selectedIndex }) => {
+        const listItem = document.createElement("li");
+        listItem.className = "missed-item";
+
+        const questionHeading = document.createElement("h3");
+        questionHeading.className = "missed-question";
+        questionHeading.textContent = `${questionIndex + 1}. ${item.question}`;
+
+        const answersBlock = document.createElement("div");
+        answersBlock.className = "missed-answers";
+
+        const playerChoice = document.createElement("p");
+        playerChoice.className = "missed-answer-row player-choice";
+        playerChoice.textContent = `Your answer: ${item.answers[selectedIndex]}`;
+
+        const correctChoice = document.createElement("p");
+        correctChoice.className = "missed-answer-row correct-choice";
+        correctChoice.textContent = `Correct answer: ${item.answers[item.correct]}`;
+
+        answersBlock.append(playerChoice, correctChoice);
+
+        const factParagraph = document.createElement("p");
+        factParagraph.className = "missed-fact";
+        factParagraph.textContent = item.fact;
+
+        listItem.append(questionHeading, answersBlock, factParagraph);
+        missedList.append(listItem);
+      });
+
+      missedReview.hidden = false;
+    }
+
     function showResults() {
       quizView.hidden = true;
       resultView.hidden = false;
@@ -662,6 +787,7 @@
       document.querySelector("#result-copy").textContent = result[2];
       document.querySelector("#final-score").textContent = score;
       updatePersonalBest();
+      renderMissedReview();
       document.querySelector("#restart-button").focus({ preventScroll: true });
     }
 
@@ -678,6 +804,9 @@
     document.querySelector("#restart-button").addEventListener("click", () => {
       currentQuestion = 0;
       score = 0;
+      selectedAnswers = [];
+      missedList.replaceChildren();
+      missedReview.hidden = true;
       resultView.hidden = true;
       quizView.hidden = false;
       renderQuestion();
