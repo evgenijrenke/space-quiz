@@ -367,7 +367,7 @@
     }
 
     .result-score {
-      margin: 0 auto 24px;
+      margin: 0 auto 12px;
       color: var(--accent-bright);
       font-size: 15px;
       font-weight: 750;
@@ -380,6 +380,15 @@
       line-height: 1.2;
       letter-spacing: -.04em;
     }
+
+    .personal-best,
+    .storage-note {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+
+    .personal-best strong { color: var(--text); }
+    .storage-note { font-size: 13px; }
 
     .result .restart-button { min-width: 160px; }
 
@@ -462,6 +471,8 @@
         <h1 id="result-title">Stellar work!</h1>
         <p class="result-copy" id="result-copy"></p>
         <p class="result-score"><span id="final-score"></span>out of 10 correct</p>
+        <p class="personal-best"><span id="personal-best-label">Personal best</span>: <strong id="personal-best-score"></strong></p>
+        <p class="storage-note" id="storage-note" hidden></p>
         <button class="restart-button" id="restart-button" type="button">Play again <span aria-hidden="true">↻</span></button>
       </div>
     </section>
@@ -542,6 +553,8 @@
     const answersElement = document.querySelector("#answers");
     const feedback = document.querySelector("#feedback");
     const nextButton = document.querySelector("#next-button");
+    const personalBestKey = "orbit-personal-best";
+    let personalBest = null;
     let currentQuestion = 0;
     let score = 0;
     let answered = false;
@@ -601,6 +614,38 @@
       nextButton.focus({ preventScroll: true });
     }
 
+    function updatePersonalBest() {
+      const storageNote = document.querySelector("#storage-note");
+      storageNote.hidden = true;
+      storageNote.textContent = "";
+      document.querySelector("#personal-best-label").textContent = "Personal best";
+      personalBest = Math.max(personalBest ?? 0, score);
+
+      try {
+        const stored = localStorage.getItem(personalBestKey);
+        let savedBest = null;
+        if (stored !== null) {
+          const value = Number(stored);
+          if (/^(0|[1-9]\d*)$/.test(stored) && Number.isInteger(value) && value <= questions.length) {
+            savedBest = value;
+          } else {
+            console.warn("Ignoring an invalid saved personal best.");
+          }
+        }
+        personalBest = Math.max(personalBest, savedBest ?? 0);
+        if (savedBest === null || personalBest > savedBest) {
+          localStorage.setItem(personalBestKey, String(personalBest));
+        }
+      } catch (error) {
+        console.warn("Could not access personal-best storage.", error);
+        document.querySelector("#personal-best-label").textContent = "Best this visit";
+        storageNote.textContent = "Browser storage is unavailable. Your best may not be saved after you leave this page.";
+        storageNote.hidden = false;
+      }
+
+      document.querySelector("#personal-best-score").textContent = `${personalBest} / ${questions.length}`;
+    }
+
     function showResults() {
       quizView.hidden = true;
       resultView.hidden = false;
@@ -616,6 +661,7 @@
       document.querySelector("#result-title").textContent = result[1];
       document.querySelector("#result-copy").textContent = result[2];
       document.querySelector("#final-score").textContent = score;
+      updatePersonalBest();
       document.querySelector("#restart-button").focus({ preventScroll: true });
     }
 
